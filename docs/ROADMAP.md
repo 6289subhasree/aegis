@@ -24,3 +24,5 @@
 - Weight calibration from logged responder overrides
 - Evaluation harness (Cohen's kappa, cluster precision/recall, WER/BLEU, time-to-critical)
 - Simulated flood-drill pilot
+- Field testing protocol for solar-assisted low-power relay nodes
+- Offline battery longevity benchmarking under burst-packet loads
