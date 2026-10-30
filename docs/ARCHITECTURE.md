@@ -35,6 +35,8 @@ flowchart LR
 | Scoring | `backend/app/services/scoring.py` |
 | Orchestration | `backend/app/services/pipeline.py` |
 | Ranked queue, override, status | `backend/app/api/incidents.py` |
+| LoRa Packet Codec | `backend/app/services/packet_codec.py` |
+| Simulation & Demo Scenarios | `backend/app/demo.py` |
 | Dashboard | `frontend/src/App.jsx` |
 
 ## Design decisions
