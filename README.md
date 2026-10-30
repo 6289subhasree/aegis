@@ -123,6 +123,12 @@ npm run dev
 Open [http://localhost:5173](http://localhost:5173).  
 Click **"Load 6-Packet LoRa Demo"** to see out-of-order radio packets automatically clustered and prioritized by threat to life.
 
+### 3. Full-Stack with Docker Compose
+```bash
+docker-compose up --build
+```
+Spins up both the backend API service and the frontend dashboard in interconnected local containers.
+
 ---
 
 ## Reproducing Poster Simulations
