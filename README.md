@@ -2,6 +2,10 @@
 
 **An inclusive, offline-first rural emergency communication network with AI-powered prioritisation.**
 
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB.svg)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com/)
+[![React](https://img.shields.io/badge/React-18+-61DAFB.svg)](https://react.dev/)
+
 > *“Every Voice Matters. Every Second Counts. Every Life Comes First.”*  
 > **RURALCONNECT 2026 · IEEE NATIONAL WORKSHOP · IIT KHARAGPUR · IDEATHON**  
 > **Authors:** Subhasree Paul · Anushka Mukherjee  
