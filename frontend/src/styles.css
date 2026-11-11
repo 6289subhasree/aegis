@@ -1,0 +1,47 @@
+:root {
+  --ink: #0e1a2b;
+  --muted: #5a6577;
+  --line: #d9d4c7;
+  --paper: #f6f3ec;
+  --crit: #d7263d;
+  --high: #f46036;
+  --med: #e8a33d;
+  --low: #2e86ab;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Inter, system-ui, sans-serif; background: var(--paper); color: var(--ink); }
+.app { max-width: 1200px; margin: 0 auto; padding: 24px 16px 48px; }
+header h1 { margin: 0; font-size: 32px; letter-spacing: -0.5px; }
+header p { margin: 4px 0 20px; color: var(--muted); }
+main { display: grid; grid-template-columns: 1.1fr 1fr; gap: 16px; align-items: start; }
+@media (max-width: 800px) { main { grid-template-columns: 1fr; } }
+.card { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+.card h3 { margin: 0 0 10px; }
+h4 { margin: 16px 0 6px; }
+textarea, input { width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 6px; font: inherit; margin-bottom: 8px; }
+button { padding: 7px 12px; border: 1px solid var(--ink); background: #fff; border-radius: 6px; cursor: pointer; font: inherit; }
+button:disabled { opacity: 0.5; cursor: default; }
+.row { display: flex; align-items: center; gap: 10px; }
+.row.wrap { flex-wrap: wrap; margin-bottom: 8px; }
+.grow { flex: 1; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.error { color: var(--crit); }
+.score { font-weight: 800; font-variant-numeric: tabular-nums; }
+.badge { color: #fff; font-weight: 800; font-size: 12px; padding: 2px 8px; border-radius: 4px; letter-spacing: 0.4px; }
+.tier-CRITICAL { background: var(--crit); }
+.tier-HIGH { background: var(--high); }
+.tier-MEDIUM { background: var(--med); }
+.tier-LOW { background: var(--low); }
+.tier-btn { color: #fff; border: none; }
+.tier-btn.active { outline: 3px solid var(--ink); }
+.queue { list-style: none; padding: 0; margin: 0; }
+.queue li { display: flex; gap: 12px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 8px; cursor: pointer; }
+.queue li.selected { border-color: var(--ink); background: #fbfaf6; }
+.rank { font-weight: 800; font-size: 20px; color: var(--muted); width: 24px; }
+.factor { margin-bottom: 8px; }
+.factor-label { display: flex; justify-content: space-between; font-size: 13px; }
+.track { height: 8px; border-radius: 4px; background: #eeece6; overflow: hidden; }
+.fill { height: 100%; background: var(--crit); }
+.reports { padding-left: 18px; margin: 0; }
+.reports li { margin-bottom: 4px; }
