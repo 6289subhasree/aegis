@@ -8,6 +8,9 @@ class Settings(BaseSettings):
 
     database_url: str = "sqlite:///./aegis.db"
 
+    # Enables /demo/load and /demo/reset. Turn off for any real deployment.
+    demo_mode: bool = True
+
     # Pipeline backends. "builtin"/"none"/"passthrough" run fully offline.
     embedder: str = "builtin"
     stt_backend: str = "none"
