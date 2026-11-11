@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Node
+node_modules/
+dist/
+
+# Env and local data
+.env
+*.db
+*.sqlite3
+data/
+
+# Models and audio (large, downloaded locally)
+models/
+*.wav
+*.mp3
+*.ogg
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
