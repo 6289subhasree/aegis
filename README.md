@@ -27,8 +27,12 @@ Report (voice / SMS / text / LoRa)
 | V | Verification: independent reports in the cluster | 0.15 |
 | A | Isolation: access cut, no connectivity | 0.10 |
 
-Tiers: **CRITICAL** >= 80, **HIGH** 60-79, **MEDIUM** 30-59, **LOW** < 30.
-Any incident with `L > 0.8` is escalated to CRITICAL regardless of its total score.
+Tiers: **CRITICAL** >= 80, **HIGH** 60-79, **MEDIUM** 30-59, **LOW** < 30, plus two escalation rules:
+
+1. `L > 0.8` (threat to life) is always CRITICAL.
+2. An isolated community (`A >= 0.8`) that is also urgent (`U >= 0.7`) or has a credible life risk (`L >= 0.5`) is at least HIGH. Isolation is worth only 10 points in the formula, so without this rule "bridge collapsed, village cut off" could never reach HIGH.
+
+The API always returns the plain-language reason when a rule, not the score band, set the tier.
 Weights are initial proposals, to be calibrated with district disaster-management officers.
 Rankings support human decisions and can always be overridden by authorised responders.
 
@@ -59,6 +63,8 @@ cd frontend
 npm install
 npm run dev                       # http://localhost:5173
 ```
+
+Press **Load flood scenario** in the dashboard to fill the queue with a realistic example.
 
 Full stack with PostgreSQL:
 

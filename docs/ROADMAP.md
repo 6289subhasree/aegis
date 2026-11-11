@@ -6,7 +6,9 @@
 - Duplicate detection (semantic similarity + radius + time window)
 - Rule-based extraction of incident type, people count, life-threat and isolation signals
 - Pluggable adapters for embeddings, speech-to-text and translation, each with an offline fallback
-- Authority dashboard skeleton (ranked queue, factor breakdown, override)
+- Authority dashboard: ranked queue, tier summary, live map (Leaflet + OpenStreetMap), factor breakdown, override
+- Demo flood scenario (10 reports, deliberately bad arrival order) with load and reset buttons
+- Escalation rules: life threat above 0.8 is CRITICAL; isolation plus urgency or life risk is at least HIGH
 - Tests, Docker Compose, CI
 
 ## Stubbed (next)
@@ -15,7 +17,6 @@
 - Sentence-BERT embedder wiring and threshold tuning
 - SMS gateway and IVR webhooks (Twilio-free options: Gammu / local GSM modem)
 - LoRa relay ingestion
-- Map view with Leaflet and OpenStreetMap tiles
 - IVR call-back verification for low-confidence reports
 - Authentication for responders
 
