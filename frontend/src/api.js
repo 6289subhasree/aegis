@@ -19,6 +19,8 @@ export const api = {
   override: (id, tier, note) =>
     request(`/incidents/${id}/override`, { method: "POST", body: JSON.stringify({ tier, note }) }),
   clearOverride: (id) => request(`/incidents/${id}/override`, { method: "DELETE" }),
+  loadDemo: () => request("/demo/load", { method: "POST" }),
+  resetDemo: () => request("/demo/reset", { method: "POST" }),
   setStatus: (id, status) =>
     request(`/incidents/${id}/status`, { method: "POST", body: JSON.stringify({ status }) }),
 };
