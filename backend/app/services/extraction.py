@@ -29,7 +29,7 @@ URGENCY_PATTERNS = [
     (r"\b(now|immediately|urgent\w*|emergency|help|sos|please hurry|right now)\b", 0.7),
     (r"\b(rising|worsening|increasing|getting worse|spreading|fast)\b", 0.8),
     (r"\b(collapsed|collapse|breach\w*|burst|landslide)\b", 0.7),
-    (r"\b(no (food|water|medicine))\b", 0.5),
+    (r"\b(no (drinking |clean |safe )?(food|water|medicine))\b", 0.5),
     (r"\b(minor|small|slight|little)\b", -0.3),
 ]
 

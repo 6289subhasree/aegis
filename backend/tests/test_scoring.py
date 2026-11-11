@@ -44,3 +44,41 @@ def test_verification_needs_independent_reports():
     assert verification_factor(1) == 0.0
     assert verification_factor(2) < verification_factor(3) < verification_factor(4)
     assert verification_factor(10) == 1.0
+
+
+def test_isolation_with_urgency_escalates_to_high():
+    # bridge collapsed, village cut off: U=0.7, A=1.0, no life signal -> band says LOW
+    f = Factors(urgency=0.7, isolation=1.0, verification=0.33)
+    score, tier = score_incident(f)
+    assert score < 30
+    assert tier == "HIGH"
+
+
+def test_isolation_with_life_risk_escalates_to_high():
+    f = Factors(life=0.6, isolation=1.0)  # e.g. pregnant woman, road cut off
+    assert score_incident(f)[1] == "HIGH"
+
+
+def test_isolation_alone_does_not_escalate():
+    f = Factors(isolation=1.0)  # road blocked, nothing urgent
+    assert score_incident(f)[1] == "LOW"
+
+
+def test_escalation_never_lowers_a_tier():
+    f = Factors(life=0.6, urgency=0.9, people=1.0, verification=1.0, isolation=1.0)
+    score, tier = score_incident(f)
+    assert tier == "CRITICAL" and score >= 80
+
+
+def test_escalation_reason_is_reported():
+    from app.services.scoring import escalation_reason
+
+    f = Factors(urgency=0.7, isolation=1.0)
+    score, tier = score_incident(f)
+    assert "isolated community" in escalation_reason(f, score, tier)
+    f2 = Factors(life=0.9)
+    s2, t2 = score_incident(f2)
+    assert "threat to life" in escalation_reason(f2, s2, t2)
+    f3 = Factors(life=0.5, urgency=0.5)
+    s3, t3 = score_incident(f3)
+    assert escalation_reason(f3, s3, t3) is None

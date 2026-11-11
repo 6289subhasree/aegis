@@ -1,5 +1,6 @@
 from ..models import Incident
 from ..schemas import FactorBreakdown, IncidentDetail, IncidentOut, ReportOut
+from ..services.scoring import Factors, escalation_reason
 
 TIER_RANK = {"CRITICAL": 3, "HIGH": 2, "MEDIUM": 1, "LOW": 0}
 
@@ -19,6 +20,11 @@ def _base(inc: Incident) -> dict:
         people_estimate=inc.people_estimate,
         score=inc.score,
         tier=inc.tier,
+        escalation=escalation_reason(
+            Factors(inc.f_life, inc.f_urgency, inc.f_people, inc.f_verification, inc.f_isolation),
+            inc.score,
+            inc.tier,
+        ),
         effective_tier=effective_tier(inc),
         override_tier=inc.override_tier,
         override_note=inc.override_note,

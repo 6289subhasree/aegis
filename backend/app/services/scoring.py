@@ -14,6 +14,9 @@ from ..config import Settings, get_settings
 
 WEIGHTS = {"L": 0.40, "U": 0.20, "P": 0.15, "V": 0.15, "A": 0.10}
 LIFE_ESCALATION_THRESHOLD = 0.8
+ISOLATION_ESCALATION = 0.8  # isolation factor at or above this compounds with urgency / life risk
+URGENCY_ESCALATION = 0.7
+LIFE_COMPOUND = 0.5
 PEOPLE_CAP = 50  # people count at which the P factor saturates at 1.0
 VERIFICATION_CAP = 4  # independent reports at which V saturates at 1.0
 
@@ -54,10 +57,9 @@ def compute_score(f: Factors) -> float:
     return round(100.0 * max(0.0, min(1.0, raw)), 1)
 
 
-def tier_for(score: float, life: float, settings: Settings | None = None) -> str:
+def band_tier(score: float, settings: Settings | None = None) -> str:
+    """Tier from the score alone, before any escalation rule."""
     s = settings or get_settings()
-    if life > LIFE_ESCALATION_THRESHOLD:
-        return "CRITICAL"
     if score >= s.tier_critical:
         return "CRITICAL"
     if score >= s.tier_high:
@@ -67,6 +69,41 @@ def tier_for(score: float, life: float, settings: Settings | None = None) -> str
     return "LOW"
 
 
+def tier_for(
+    score: float,
+    life: float,
+    settings: Settings | None = None,
+    urgency: float = 0.0,
+    isolation: float = 0.0,
+) -> str:
+    """Score band plus two explicit, explainable escalation rules.
+
+    Rule 1: threat to life above 0.8 is always CRITICAL.
+    Rule 2: an isolated community (cut off, access lost) that is also urgent or has a credible
+            life risk is at least HIGH. Isolation alone is worth only 10 points in the formula, so
+            without this rule "bridge collapsed, village cut off" could never reach HIGH.
+    """
+    if life > LIFE_ESCALATION_THRESHOLD:
+        return "CRITICAL"
+    tier = band_tier(score, settings)
+    if (
+        isolation >= ISOLATION_ESCALATION
+        and (urgency >= URGENCY_ESCALATION or life >= LIFE_COMPOUND)
+        and TIER_ORDER.index(tier) < TIER_ORDER.index("HIGH")
+    ):
+        tier = "HIGH"
+    return tier
+
+
+def escalation_reason(f: Factors, score: float, tier: str, settings: Settings | None = None) -> str | None:
+    """Plain-language reason when a rule, not the score band, set the tier."""
+    if tier == band_tier(score, settings):
+        return None
+    if f.life > LIFE_ESCALATION_THRESHOLD:
+        return "Escalated to CRITICAL by rule: threat to life above 0.8."
+    return "Escalated to HIGH by rule: isolated community with an urgent or life-threatening situation."
+
+
 def score_incident(f: Factors, settings: Settings | None = None) -> tuple[float, str]:
     score = compute_score(f)
-    return score, tier_for(score, f.life, settings)
+    return score, tier_for(score, f.life, settings, urgency=f.urgency, isolation=f.isolation)

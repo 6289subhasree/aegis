@@ -49,6 +49,7 @@ class IncidentOut(BaseModel):
     people_estimate: int
     score: float
     tier: Tier
+    escalation: str | None = None
     effective_tier: Tier
     override_tier: Tier | None
     override_note: str | None
