@@ -1,0 +1,8 @@
+# Optional local models. All free and open source, nothing here calls a paid API.
+# Install with: pip install -r requirements-ml.txt
+
+faster-whisper>=1.0            # STT_BACKEND=whisper
+sentence-transformers>=3.0     # EMBEDDER=sbert
+spacy>=3.7                     # optional NER upgrade for extraction
+# IndicTrans2 (TRANSLATOR=indictrans2) is installed from its GitHub repo:
+#   https://github.com/AI4Bharat/IndicTrans2
