@@ -20,8 +20,14 @@ def process_report(
     language: str | None = None,
     lat: float | None = None,
     lon: float | None = None,
+    english_text: str | None = None,
 ) -> tuple[Report, Incident]:
-    english, lang = get_translator().to_english(text, language)
+    """`english_text` lets a caller that already has an English version (voice, via Whisper's
+    translate task) skip the text translator. `text` is always kept as the original."""
+    if english_text is not None:
+        english, lang = english_text, language or "en"
+    else:
+        english, lang = get_translator().to_english(text, language)
     ex = extraction.extract(english)
     embedding = get_embedder().embed(english)
 

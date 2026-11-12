@@ -76,3 +76,9 @@ class IngestResult(BaseModel):
     report: ReportOut
     incident: IncidentOut
     merged: bool
+
+
+class VoiceIngestResult(IngestResult):
+    transcript: str  # in the spoken language
+    english: str
+    language: str

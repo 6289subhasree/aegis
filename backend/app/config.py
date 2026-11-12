@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     # Pipeline backends. "builtin"/"none"/"passthrough" run fully offline.
     embedder: str = "builtin"
     stt_backend: str = "none"
+    # Whisper model size: tiny | base | small | medium. "small" is a good CPU default;
+    # use "medium" (~1.5 GB) if Hindi accuracy on "small" is not good enough.
+    whisper_model: str = "small"
+    whisper_device: str = "cpu"
     translator: str = "passthrough"
 
     # Duplicate detection. 0.45 suits the built-in hashing embedder (paraphrases score ~0.5-0.7,
