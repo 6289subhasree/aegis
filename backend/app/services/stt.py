@@ -26,7 +26,7 @@ class SpeechToText(Protocol):
 class NoSTT:
     def transcribe(self, audio: bytes, language: str | None = None) -> Transcript:
         raise RuntimeError(
-            "Voice reports need STT_BACKEND=whisper. Install with: pip install -r requirements-ml.txt"
+            "Voice reports need STT_BACKEND=whisper. Install with: pip install -r requirements-voice.txt"
         )
 
 
@@ -35,7 +35,7 @@ class WhisperSTT:  # pragma: no cover - needs a model download
         try:
             from faster_whisper import WhisperModel
         except ImportError as e:
-            raise RuntimeError("STT_BACKEND=whisper needs: pip install -r requirements-ml.txt") from e
+            raise RuntimeError("STT_BACKEND=whisper needs: pip install -r requirements-voice.txt") from e
         s = get_settings()
         self._model = WhisperModel(
             size or s.whisper_model,

@@ -1,4 +1,6 @@
 # Optional local models. All free and open source, nothing here calls a paid API.
+# Heavy extras (pulls in PyTorch, several GB). Only needed for Sentence-BERT / spaCy.
+# For voice reports alone, use requirements-voice.txt instead.
 # Install with: pip install -r requirements-ml.txt
 
 faster-whisper>=1.0            # STT_BACKEND=whisper (decodes browser audio itself, no ffmpeg needed)

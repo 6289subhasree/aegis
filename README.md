@@ -73,7 +73,7 @@ model is downloaded.
 
 ```bash
 cd backend
-pip install -r requirements-ml.txt
+pip install -r requirements-voice.txt       # small install, no PyTorch
 python -m app.tools.download_models        # one time, needs internet (about 0.5 GB for "small")
 ```
 

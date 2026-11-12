@@ -14,7 +14,7 @@ def main() -> None:
     try:
         from faster_whisper import WhisperModel
     except ImportError:
-        sys.exit("faster-whisper is not installed. Run: pip install -r requirements-ml.txt")
+        sys.exit("faster-whisper is not installed. Run: pip install -r requirements-voice.txt")
     print(f"Downloading Whisper '{size}' (one time, needs internet)...")
     WhisperModel(size, device="cpu", compute_type="int8")
     print("Done. The model is cached on this computer; no internet is needed from now on.")
