@@ -9,10 +9,10 @@
 - Authority dashboard: ranked queue, tier summary, live map (Leaflet + OpenStreetMap), factor breakdown, override
 - Demo flood scenario (10 reports, deliberately bad arrival order) with load and reset buttons
 - Escalation rules: life threat above 0.8 is CRITICAL; isolation plus urgency or life risk is at least HIGH
+- Voice reports: in-browser recording, local Whisper transcription, Hindi/English, original transcript kept
 - Tests, Docker Compose, CI
 
 ## Stubbed (next)
-- Real Whisper speech-to-text adapter
 - Real IndicTrans2 translation adapter and language ID
 - Sentence-BERT embedder wiring and threshold tuning
 - SMS gateway and IVR webhooks (Twilio-free options: Gammu / local GSM modem)

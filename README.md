@@ -66,6 +66,29 @@ npm run dev                       # http://localhost:5173
 
 Press **Load flood scenario** in the dashboard to fill the queue with a realistic example.
 
+## Voice reports (Hindi and English)
+
+Voice is transcribed on your own computer with Whisper. It is free and needs no internet once the
+model is downloaded.
+
+```bash
+cd backend
+pip install -r requirements-ml.txt
+python -m app.tools.download_models        # one time, needs internet (about 0.5 GB for "small")
+```
+
+Then set `STT_BACKEND=whisper` in `backend/.env` and restart the backend. In the dashboard, press
+**Record**, speak, and press **Stop**. For non-English speech the dashboard shows what was heard and
+the English version that was scored.
+
+Check recognition quality on a recording of your own voice before relying on it:
+
+```bash
+python -m app.tools.transcribe my_recording.wav hi
+```
+
+If Hindi accuracy on `small` is not good enough, set `WHISPER_MODEL=medium` (about 1.5 GB, slower).
+
 Full stack with PostgreSQL:
 
 ```bash

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api.js";
 import MapView from "./MapView.jsx";
 
@@ -101,6 +101,117 @@ function ReportForm({ onSubmitted }) {
       </button>
       {error && <p className="error">{error}</p>}
     </form>
+  );
+}
+
+const LANG_NAMES = { hi: "Hindi", en: "English", bn: "Bengali" };
+const MAX_RECORD_SECONDS = 30;
+
+function VoiceRecorder({ onSubmitted }) {
+  const [state, setState] = useState("idle"); // idle | recording | processing
+  const [lang, setLang] = useState("");
+  const [secs, setSecs] = useState(0);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState("");
+  const recorder = useRef(null);
+  const chunks = useRef([]);
+  const timer = useRef(null);
+
+  useEffect(() => () => clearInterval(timer.current), []);
+
+  async function start() {
+    setError("");
+    setResult(null);
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError("This browser cannot record audio. Open the dashboard at http://localhost:5173 in Chrome or Edge.");
+      return;
+    }
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      setError("Microphone access was blocked. Allow the microphone for this page and try again.");
+      return;
+    }
+    chunks.current = [];
+    const rec = new MediaRecorder(stream);
+    rec.ondataavailable = (e) => e.data.size && chunks.current.push(e.data);
+    rec.onstop = async () => {
+      stream.getTracks().forEach((t) => t.stop());
+      clearInterval(timer.current);
+      setState("processing");
+      try {
+        const blob = new Blob(chunks.current, { type: rec.mimeType || "audio/webm" });
+        // Demo coordinates; real reports carry GPS / cell-tower location from the gateway.
+        const out = await api.submitVoice(blob, {
+          lat: 21.94 + (Math.random() - 0.5) * 0.08,
+          lon: 88.85 + (Math.random() - 0.5) * 0.1,
+          language: lang,
+        });
+        setResult(out);
+        onSubmitted();
+      } catch (e) {
+        setError(e.message);
+      } finally {
+        setState("idle");
+      }
+    };
+    recorder.current = rec;
+    rec.start();
+    setSecs(0);
+    setState("recording");
+    timer.current = setInterval(() => {
+      setSecs((s) => {
+        if (s + 1 >= MAX_RECORD_SECONDS) rec.state === "recording" && rec.stop();
+        return s + 1;
+      });
+    }, 1000);
+  }
+
+  function stop() {
+    if (recorder.current?.state === "recording") recorder.current.stop();
+  }
+
+  return (
+    <div className="card">
+      <h3>Send a voice report</h3>
+      <p className="muted small">Speak in Hindi or English. The speech is transcribed on this computer, with no internet needed.</p>
+      <div className="row wrap">
+        {state !== "recording" ? (
+          <button className="primary" disabled={state === "processing"} onClick={start}>
+            {state === "processing" ? "Transcribing…" : "● Record"}
+          </button>
+        ) : (
+          <button className="rec" onClick={stop}>
+            ■ Stop ({secs}s)
+          </button>
+        )}
+        <select value={lang} onChange={(e) => setLang(e.target.value)} disabled={state !== "idle"}>
+          <option value="">Auto-detect language</option>
+          <option value="hi">Hindi</option>
+          <option value="en">English</option>
+        </select>
+      </div>
+      {error && <p className="error">{error}</p>}
+      {result && (
+        <div className="heard">
+          <div className="muted small">Heard ({LANG_NAMES[result.language] || result.language}):</div>
+          <div className="heard-text">{result.transcript}</div>
+          {result.language !== "en" && (
+            <>
+              <div className="muted small">Understood as (English):</div>
+              <div className="heard-text">{result.english}</div>
+            </>
+          )}
+          <div className="row">
+            <TierBadge tier={result.incident.effective_tier} />
+            <span className="muted small">
+              {result.merged ? "merged into an existing incident" : "new incident"}
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -271,6 +382,7 @@ export default function App() {
               ))}
             </ol>
           </div>
+          <VoiceRecorder onSubmitted={refresh} />
           <ReportForm onSubmitted={refresh} />
         </section>
 

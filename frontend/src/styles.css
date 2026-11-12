@@ -83,3 +83,9 @@ button:disabled { opacity: 0.5; cursor: default; }
 .pin-MEDIUM { background: var(--med); }
 .pin-LOW { background: var(--low); }
 .pin.sel { outline: 3px solid var(--ink); }
+
+select { padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; font: inherit; background: #fff; }
+button.rec { background: var(--crit); color: #fff; border-color: var(--crit); animation: pulse 1.2s infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+.heard { margin-top: 10px; padding: 10px 12px; background: #faf9f6; border: 1px solid var(--line); border-radius: 8px; }
+.heard-text { font-size: 16px; font-weight: 600; margin: 2px 0 8px; }
