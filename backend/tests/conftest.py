@@ -7,14 +7,17 @@ from app.main import app
 
 
 @pytest.fixture()
-def session():
-    engine = db_module.make_engine("sqlite://")
-    db_module.Base.metadata.drop_all(bind=engine)
+def session(monkeypatch):
+    engine = db_module.make_engine("sqlite:///:memory:")
+    monkeypatch.setattr(db_module, "engine", engine)
+    monkeypatch.setattr("app.main.init_db", lambda: None)
+    
     from app import models  # noqa: F401
-
     db_module.Base.metadata.create_all(bind=engine)
-    Session = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
-    s = Session()
+    
+    TestingSession = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+    s = TestingSession()
+    monkeypatch.setattr(db_module, "SessionLocal", TestingSession)
     yield s
     s.close()
 
@@ -25,7 +28,5 @@ def client(session):
         yield session
 
     app.dependency_overrides[db_module.get_db] = override
-    # lifespan would create tables on the real engine; tests use the in-memory one
-    with TestClient(app) as c:
-        yield c
+    yield TestClient(app)
     app.dependency_overrides.clear()

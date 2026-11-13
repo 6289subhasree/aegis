@@ -38,7 +38,10 @@ export const api = {
     return res.json();
   },
   loadDemo: () => request("/demo/load", { method: "POST" }),
+  loadPacketDemo: () => request("/demo/load-packets", { method: "POST" }),
   resetDemo: () => request("/demo/reset", { method: "POST" }),
+  submitPacket: (packet_base64) =>
+    request("/reports/packet", { method: "POST", body: JSON.stringify({ packet_base64 }) }),
   setStatus: (id, status) =>
     request(`/incidents/${id}/status`, { method: "POST", body: JSON.stringify({ status }) }),
 };

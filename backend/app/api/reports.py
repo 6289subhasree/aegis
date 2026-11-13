@@ -4,8 +4,9 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..models import Incident
-from ..schemas import IngestResult, ReportIn, ReportOut, VoiceIngestResult
-from ..services.pipeline import process_report
+from ..schemas import IngestResult, PacketIn, ReportIn, ReportOut, VoiceIngestResult
+from ..services.packet_codec import packet_from_base64_sms
+from ..services.pipeline import process_packet_report, process_report
 from ..services.stt import get_stt
 from .serializers import incident_out
 
@@ -30,6 +31,27 @@ def submit_report(payload: ReportIn, db: Session = Depends(get_db)):
         incident=incident_out(incident),
         merged=_incident_count(db) == before,
     )
+
+
+@router.post("/packet", response_model=IngestResult, status_code=201)
+def submit_packet(payload: PacketIn, db: Session = Depends(get_db)):
+    """Ingest a 28-character Base64 encoded 20-byte LoRa/SMS packet.
+
+    Gateway verifies CRC-16, parses flags and geolocation, and feeds pipeline.
+    """
+    try:
+        packet = packet_from_base64_sms(payload.packet_base64)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    before = _incident_count(db)
+    report, incident = process_packet_report(db, packet)
+    return IngestResult(
+        report=ReportOut.model_validate(report),
+        incident=incident_out(incident),
+        merged=_incident_count(db) == before,
+    )
+
 
 
 @router.post("/voice", response_model=VoiceIngestResult, status_code=201)

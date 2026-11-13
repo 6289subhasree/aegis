@@ -19,6 +19,15 @@ def load_demo_scenario(db: Session = Depends(get_db)):
     return demo.load_scenario(db)
 
 
+@router.post("/load-packets", dependencies=[Depends(_require_demo_mode)])
+def load_packet_scenario(db: Session = Depends(get_db)):
+    """Submit the 6-packet LoRa/SMS demo from Poster Section 06.
+    6 packets arrive out of order; the 5th and 6th (life threat) rank #1 and #2.
+    """
+    return demo.load_packet_scenario(db)
+
+
+
 @router.post("/reset", dependencies=[Depends(_require_demo_mode)])
 def reset_demo(db: Session = Depends(get_db)):
     """Delete all reports, incidents and override logs."""

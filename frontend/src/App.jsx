@@ -104,6 +104,51 @@ function ReportForm({ onSubmitted }) {
   );
 }
 
+function PacketForm({ onSubmitted }) {
+  const [b64, setB64] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submit(e) {
+    if (e) e.preventDefault();
+    if (!b64.trim()) return;
+    setBusy(true);
+    setError("");
+    try {
+      await api.submitPacket(b64.trim());
+      setB64("");
+      onSubmitted();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form className="card" onSubmit={submit}>
+      <h3>LoRa / SMS 20B Packet Ingest</h3>
+      <p className="muted small">
+        Compact 20-byte packet (28 chars Base64) with CRC-16, geocell, and L/U/A flags.
+      </p>
+      <input
+        type="text"
+        value={b64}
+        onChange={(e) => setB64(e.target.value)}
+        placeholder="Paste 28-character Base64 packet..."
+        maxLength={28}
+        style={{ width: "100%", marginBottom: "8px", fontFamily: "monospace", padding: "6px" }}
+      />
+      <div className="row">
+        <button className="primary" disabled={busy || b64.trim().length !== 28}>
+          {busy ? "Verifying CRC & Ingesting…" : "Ingest Packet"}
+        </button>
+      </div>
+      {error && <p className="error">{error}</p>}
+    </form>
+  );
+}
+
 const LANG_NAMES = { hi: "Hindi", en: "English", bn: "Bengali" };
 const MAX_RECORD_SECONDS = 30;
 
@@ -329,12 +374,20 @@ export default function App() {
       <header>
         <div>
           <h1>
-            Aegis<span className="dot">.</span>
+            DisasterSignal<span className="dot">.</span>
           </h1>
-          <p>Severity-first emergency queue. The most dangerous incident is first, not the earliest.</p>
+          <p style={{ margin: "2px 0", color: "#e2e8f0", fontWeight: 500 }}>
+            Every Voice Matters. Every Second Counts. Every Life Comes First.
+          </p>
+          <p className="muted small" style={{ margin: "2px 0" }}>
+            RURALCONNECT 2026 · IEEE NATIONAL WORKSHOP · IIT KHARAGPUR · Offline-First Rural Emergency Prioritisation
+          </p>
         </div>
-        <div className="row">
-          <button className="primary" disabled={busy} onClick={() => run(api.loadDemo)}>
+        <div className="row" style={{ flexWrap: "wrap", gap: "8px" }}>
+          <button className="primary" disabled={busy} onClick={() => run(api.loadPacketDemo)}>
+            Load 6-Packet LoRa Demo
+          </button>
+          <button disabled={busy} onClick={() => run(api.loadDemo)}>
             Load flood scenario
           </button>
           <button
@@ -382,6 +435,7 @@ export default function App() {
               ))}
             </ol>
           </div>
+          <PacketForm onSubmitted={refresh} />
           <VoiceRecorder onSubmitted={refresh} />
           <ReportForm onSubmitted={refresh} />
         </section>

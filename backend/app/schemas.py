@@ -14,6 +14,11 @@ class ReportIn(BaseModel):
     lon: float | None = Field(default=None, ge=-180, le=180)
 
 
+class PacketIn(BaseModel):
+    packet_base64: str = Field(min_length=28, max_length=28, description="28-char Base64 SMS or LoRa frame")
+
+
+
 class ReportOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
