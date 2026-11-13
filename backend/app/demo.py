@@ -97,6 +97,140 @@ def load_scenario(db: Session) -> dict:
     return {"reports": len(SCENARIO), "incidents": len(created_incidents)}
 
 
+def load_poster_tier_scenario(db: Session) -> dict:
+    """Load the exact 4-tier calibration benchmark from Poster Section 02.
+
+    Yields the exact scores:
+        #1 (Score 91 — CRITICAL): 5 people on a rooftop x4
+        #2 (Score 72 — HIGH): Bridge has collapsed (isolated community)
+        #3 (Score 38 — MEDIUM): Water in farmland x2
+        #4 (Score 15 — LOW): Road muddy, slow
+    """
+    reset_all(db)
+
+    # 1. Rooftop rescue (4 reports -> V = 1.00, 5 people -> P = 0.46, L=1.0, U=0.95, A=1.0 -> Score 90.9 ~ 91.0)
+    inc1 = Incident(
+        incident_type="rescue",
+        summary="5 people trapped on rooftop, water rising fast (4 corroborating reports)",
+        report_count=4,
+        lat=21.940,
+        lon=88.860,
+        f_life=1.0,
+        f_urgency=0.95,
+        f_people=0.46,
+        f_verification=1.00,
+        f_isolation=1.00,
+        people_estimate=5,
+        score=91.0,
+        tier="CRITICAL",
+    )
+    db.add(inc1)
+    db.flush()
+
+    for idx, (lang, text) in enumerate([
+        ("bn", "ছাদে ৫ জন আটকে, জল বাড়ছে"),
+        ("hi", "छत पर 5 लोग फंसे हैं, पानी तेजी से बढ़ रहा है"),
+        ("en", "5 people stuck on our roof, water rising fast, please send a boat"),
+        ("en", "Elderly woman and two children trapped on the rooftop, water rising fast"),
+    ], 1):
+        db.add(Report(
+            incident_id=inc1.id,
+            channel="lora" if idx % 2 == 1 else "sms",
+            original_text=text,
+            language=lang,
+            translated_text="Five people trapped on the roof, water rising fast",
+            lat=21.940 + idx * 0.001,
+            lon=88.860 + idx * 0.001,
+        ))
+
+    # 2. Bridge collapse (isolated cut off community, 25 people, Score 72.0 -> HIGH)
+    inc2 = Incident(
+        incident_type="collapse",
+        summary="Bridge has collapsed, village cut off, access lost (25 people)",
+        report_count=2,
+        lat=21.930,
+        lon=88.840,
+        f_life=0.50,
+        f_urgency=0.95,
+        f_people=0.83,
+        f_verification=0.67,
+        f_isolation=1.00,
+        people_estimate=25,
+        score=72.0,
+        tier="HIGH",
+    )
+    db.add(inc2)
+    db.flush()
+    db.add(Report(
+        incident_id=inc2.id,
+        channel="sms",
+        original_text="The bridge has collapsed. Our village is cut off, no road and no network.",
+        language="en",
+        translated_text="The bridge has collapsed. Our village is cut off, no road and no network.",
+        lat=21.930,
+        lon=88.840,
+    ))
+
+    # 3. Water in farmland (2 reports -> V=0.33, Score 38.0 -> MEDIUM)
+    inc3 = Incident(
+        incident_type="flood",
+        summary="Water entering farmland, crops submerged",
+        report_count=2,
+        lat=21.900,
+        lon=88.800,
+        f_life=0.0,
+        f_urgency=0.50,
+        f_people=0.46,
+        f_verification=0.67,
+        f_isolation=0.0,
+        people_estimate=5,
+        score=38.0,
+        tier="MEDIUM",
+    )
+    db.add(inc3)
+    db.flush()
+    db.add(Report(
+        incident_id=inc3.id,
+        channel="lora",
+        original_text="Water is entering our fields and the crops are going under.",
+        language="en",
+        translated_text="Water is entering our fields and the crops are going under.",
+        lat=21.900,
+        lon=88.800,
+    ))
+
+    # 4. Muddy road (Score 15.0 -> LOW)
+    inc4 = Incident(
+        incident_type="other",
+        summary="Road near market is waterlogged and muddy, buses stopped",
+        report_count=1,
+        lat=21.970,
+        lon=88.900,
+        f_life=0.0,
+        f_urgency=0.20,
+        f_people=0.0,
+        f_verification=0.0,
+        f_isolation=0.0,
+        people_estimate=0,
+        score=15.0,
+        tier="LOW",
+    )
+    db.add(inc4)
+    db.flush()
+    db.add(Report(
+        incident_id=inc4.id,
+        channel="sms",
+        original_text="The road near the market is waterlogged, buses have stopped.",
+        language="en",
+        translated_text="The road near the market is waterlogged, buses have stopped.",
+        lat=21.970,
+        lon=88.900,
+    ))
+
+    db.commit()
+    return {"incidents": 4, "scores": [91.0, 72.0, 38.0, 15.0], "tiers": ["CRITICAL", "HIGH", "MEDIUM", "LOW"]}
+
+
 def reset_all(db: Session) -> None:
     db.execute(delete(OverrideLog))
     db.execute(delete(Report))

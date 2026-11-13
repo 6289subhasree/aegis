@@ -16,13 +16,15 @@ Reliable connectivity comes before digital inclusion, and in a flood or cyclone 
 **DisasterSignal** is a communication network first and an intelligence layer second:
 1. **Inclusive Access Layer:** Ingests reports across Voice, IVR, SMS, App, and solar-powered LoRa mesh relays.
 2. **Compact 20-Byte Packet:** Fits a single LoRa SF9 frame and a single 28-character Base64 SMS, protected with CRC-16 error detection.
-3. **Multilingual Understanding:** Transcribes speech locally via Whisper (Hindi/English) and translates across 22 Scheduled Indian Languages.
+3. **Multilingual Understanding:** Transcribes speech locally via Whisper (Hindi/English implemented and tested offline); IndicTrans2 translation architecture defined for full 22-language pipeline.
 4. **Duplicate Clustering:** Spatio-temporal and semantic centroid clustering merges redundant reports into corroborating evidence.
-5. **Severity-First Triage:** Prioritises rescue requests mathematically rather than by arrival order, reducing critical queue wait times by over 90%.
+5. **Severity-First Triage:** Prioritises rescue requests mathematically rather than by arrival order, reducing critical queue wait times by 81% to 97% under disaster surges (Section 12).
 
 ---
 
 ## Same Inbox. Different Order.
+
+*(Demonstrates 4-tier calibration benchmark from Poster Section 02; loadable via `POST /demo/load-poster-tiers`)*
 
 | TODAY: BY ARRIVAL (FIFO) | DISASTERSIGNAL: RANKED BY THREAT TO LIFE |
 | :--- | :--- |
@@ -138,9 +140,9 @@ python simulations/network_resilience.py
 python simulations/surge_queue.py
 ```
 * Simulates 400 reports over 200 runs with 1 officer (mean service time 0.78 min):
-  * Load 0.85: FIFO 3.7 min $\to$ Severity-First 0.8 min (**-80%**)
-  * Load 1.00: FIFO 10.7 min $\to$ Severity-First 0.9 min (**-92%**)
-  * Load 1.30: FIFO 38.1 min $\to$ Severity-First 1.0 min (**-97%**)
+  * Load 0.85: FIFO 4.1 min $\to$ Severity-First 0.8 min (**-81%**)
+  * Load 1.00: FIFO 11.0 min $\to$ Severity-First 0.9 min (**-92%**)
+  * Load 1.30: FIFO 37.8 min $\to$ Severity-First 1.0 min (**-97%**)
 
 ---
 

@@ -27,6 +27,12 @@ def load_packet_scenario(db: Session = Depends(get_db)):
     return demo.load_packet_scenario(db)
 
 
+@router.post("/load-poster-tiers", dependencies=[Depends(_require_demo_mode)])
+def load_poster_tier_scenario(db: Session = Depends(get_db)):
+    """Load the exact 4-tier calibration benchmark from Poster Section 02 (Scores: 91, 72, 38, 15)."""
+    return demo.load_poster_tier_scenario(db)
+
+
 
 @router.post("/reset", dependencies=[Depends(_require_demo_mode)])
 def reset_demo(db: Session = Depends(get_db)):
