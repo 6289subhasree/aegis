@@ -24,7 +24,7 @@ import struct
 from dataclasses import dataclass
 
 CHANNELS = ["voice", "sms", "app", "lora"]
-CHANNEL_TO_ID = {c: i for i, c in enumerate(CHANNELS)}
+CHANNEL_TO_ID = {"voice": 0, "ivr": 0, "sms": 1, "app": 2, "lora": 3}
 
 # 22 Scheduled Indian Languages + English
 LANGUAGES = [
@@ -71,7 +71,7 @@ class PacketReport:
 def _encode_geocell(lat: float, lon: float) -> bytes:
     """Encode latitude and longitude into 6 bytes (3 bytes lat, 3 bytes lon).
 
-    Yields sub-meter resolution globally:
+    Yields high resolution (~1.2 m lat, ~2.2 m lon at typical Indian latitudes):
     lat in [-90, +90] mapped to uint24 [0, 2^24 - 1]
     lon in [-180, +180] mapped to uint24 [0, 2^24 - 1]
     """
@@ -92,9 +92,16 @@ def _decode_geocell(b: bytes) -> tuple[float, float]:
 
 def encode_packet(p: PacketReport) -> bytes:
     """Encode a PacketReport into exactly 20 bytes with CRC-16."""
+    if p.hop_count < 0 or p.hop_count > 7:
+        raise ValueError(f"Hop count must be 0..7 (3 bits), got {p.hop_count}")
+    if p.language not in LANG_TO_ID:
+        raise ValueError(f"Unsupported language '{p.language}'. Supported: {LANGUAGES}")
+    if p.channel not in CHANNEL_TO_ID:
+        raise ValueError(f"Unsupported channel '{p.channel}'. Supported: {list(CHANNEL_TO_ID.keys())}")
+
     ver = p.version & 0x01
-    chan_id = CHANNEL_TO_ID.get(p.channel, 3) & 0x03
-    lang_id = LANG_TO_ID.get(p.language, 0) & 0x1F
+    chan_id = CHANNEL_TO_ID[p.channel]
+    lang_id = LANG_TO_ID[p.language]
     byte0 = (ver << 7) | (chan_id << 5) | lang_id
 
     type_id = TYPE_TO_ID.get(p.incident_type, 0) & 0xFF
@@ -112,7 +119,7 @@ def encode_packet(p: PacketReport) -> bytes:
         flag_byte |= 0x02  # bit 1: U (urgency)
     if p.flag_isolation:
         flag_byte |= 0x04  # bit 2: A (isolation)
-    flag_byte |= (p.hop_count & 0x07) << 5  # bits 5-7: hop count
+    flag_byte |= (p.hop_count & 0x07) << 5  # bits 5-7: hop count (0..7)
 
     payload = struct.pack(
         ">BBB6sIIB",

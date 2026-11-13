@@ -105,3 +105,20 @@ def test_crc_detects_every_single_bit_error():
             # Must raise ValueError due to CRC mismatch
             with pytest.raises(ValueError):
                 decode_packet(bytes(corrupted))
+
+
+def test_hop_count_and_language_validation():
+    """Ensure out-of-bounds hop counts and unknown language/channel codes are rejected."""
+    # Hop count out of 3-bit range (0..7)
+    with pytest.raises(ValueError, match="Hop count"):
+        encode_packet(PacketReport(hop_count=8))
+    with pytest.raises(ValueError, match="Hop count"):
+        encode_packet(PacketReport(hop_count=-1))
+
+    # Unknown language code
+    with pytest.raises(ValueError, match="Unsupported language"):
+        encode_packet(PacketReport(language="xyz"))
+
+    # Unknown channel
+    with pytest.raises(ValueError, match="Unsupported channel"):
+        encode_packet(PacketReport(channel="satellite_mesh"))

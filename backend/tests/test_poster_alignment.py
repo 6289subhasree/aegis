@@ -117,3 +117,48 @@ def test_escalation_rules_match_poster_section_08():
     # Rule 2: isolated + life risk
     tier3 = scoring.tier_for(score=25.0, life=0.55, urgency=0.0, isolation=0.85)
     assert tier3 == "HIGH"
+
+
+def test_section_02_illustrative_scores_and_p_formula_alignment():
+    """Verify Poster Section 02 illustrative scores and formula parameters:
+    1. Scores: 91 (CRITICAL), 72 (HIGH), 38 (MEDIUM), 15 (LOW)
+    2. People saturation: ln(1+n)/ln(51) yields 0.46 for n=5 (ln(150) would yield 0.36)
+    3. Rule 1: L > 0.8 correctly prevents single 0.8 life phrases from premature CRITICAL
+    """
+    # 1. Tier boundaries for illustrative scores
+    assert scoring.band_tier(91.0) == "CRITICAL"
+    assert scoring.band_tier(72.0) == "HIGH"
+    assert scoring.band_tier(38.0) == "MEDIUM"
+    assert scoring.band_tier(15.0) == "LOW"
+
+    # 2. People factor saturation
+    # With n=5 people: ln(6)/ln(51) = 1.79176 / 3.93183 = 0.4557 -> rounds to 0.46
+    import math
+    p5_code = scoring.people_factor(5)
+    assert round(p5_code, 2) == 0.46
+    p5_hypothetical_150 = math.log1p(5) / math.log1p(150)
+    assert round(p5_hypothetical_150, 2) == 0.36  # proves ln(51) is required for poster's 0.46!
+
+    # 3. Rule 1 boundary: exactly 0.8 should NOT trigger CRITICAL by rule alone
+    tier_at_08 = scoring.tier_for(score=25.0, life=0.8, urgency=0.0, isolation=0.0)
+    assert tier_at_08 == "LOW"
+    tier_above_08 = scoring.tier_for(score=25.0, life=0.81, urgency=0.0, isolation=0.0)
+    assert tier_above_08 == "CRITICAL"
+
+
+def test_load_poster_tier_scenario_reproduces_exact_benchmark():
+    """Verify demo.load_poster_tier_scenario creates the exact 4-tier benchmark."""
+    from app.demo import load_poster_tier_scenario
+    engine = db_module.make_engine("sqlite:///:memory:")
+    db_module.Base.metadata.create_all(bind=engine)
+    Session = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+    db = Session()
+
+    out = load_poster_tier_scenario(db)
+    assert out["incidents"] == 4
+    assert out["scores"] == [91.0, 72.0, 38.0, 15.0]
+
+    incidents = db.query(Incident).order_by(Incident.score.desc()).all()
+    assert [inc.score for inc in incidents] == [91.0, 72.0, 38.0, 15.0]
+    assert [inc.tier for inc in incidents] == ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
+    db.close()

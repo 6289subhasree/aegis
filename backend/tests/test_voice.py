@@ -105,9 +105,16 @@ def _fake_whisper_model(calls, heard_lang, results):
     return FakeModel
 
 
-def test_whisper_adapter_runs_translate_pass_only_for_non_english(monkeypatch):
+try:
     import faster_whisper
+    HAS_FASTER_WHISPER = True
+except ImportError:
+    faster_whisper = None  # type: ignore
+    HAS_FASTER_WHISPER = False
 
+
+@pytest.mark.skipif(not HAS_FASTER_WHISPER, reason="faster_whisper not installed; install requirements-voice.txt")
+def test_whisper_adapter_runs_translate_pass_only_for_non_english(monkeypatch):
     from app.services.stt import WhisperSTT
 
     calls = []
@@ -122,9 +129,8 @@ def test_whisper_adapter_runs_translate_pass_only_for_non_english(monkeypatch):
     assert all(c["vad"] for c in calls)  # silence filtering on
 
 
+@pytest.mark.skipif(not HAS_FASTER_WHISPER, reason="faster_whisper not installed; install requirements-voice.txt")
 def test_whisper_adapter_single_pass_for_english(monkeypatch):
-    import faster_whisper
-
     from app.services.stt import WhisperSTT
 
     calls = []

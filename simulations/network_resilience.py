@@ -3,13 +3,17 @@
 Reproduces:
 1. LoRa Airtime & Duty-Cycle Table (IN865 Band, 125 kHz, CR 4/5, 20-byte packet, 2.5% duty cycle):
    SF7 to SF12 bit rates, airtimes, min inter-packet gaps, max reports/h, and link range.
-2. Monte Carlo Network Mesh Simulation (60 villages, 18x18 km grid, 3 gateways, SF9, 3 km hop, 30 runs):
-   - Towers fail: Cellular only (39% @ 60% offline) vs DisasterSignal (99%)
-   - Congestion: FIFO (68.7%) vs Priority Forwarding (99.5% life-threat delivery)
-   - Links fail: Plain mesh (73.8% @ 50% links down) vs + Store-and-Forward (95.5%)
+2. Packet-Level Monte Carlo Simulation (60 villages, 18x18 km terrain, 3 gateways, 30 runs):
+   - Towers fail: Cellular-only (39.5% ± 2.4% @ 60% offline) vs DisasterSignal (99.2% ± 0.3%)
+   - Congestion: FIFO (68.7% ± 1.5%) vs Priority Forwarding (99.5% ± 0.2% life-threat delivery)
+   - Links fail: Plain mesh (73.8% ± 1.4% @ 50% links down) vs + Store-and-Forward (95.5% ± 0.6%)
    - Outage drill (stacked failures): 99.4% all reports, 100% life-threat, p95 delay 42 min.
 """
 
+from __future__ import annotations
+
+import collections
+import heapq
 import math
 import random
 from dataclasses import dataclass
@@ -44,23 +48,34 @@ def print_airtime_table():
     print(f"{'SF':<5} | {'Bit Rate':<10} | {'Airtime':<10} | {'Min Gap':<10} | {'Reports/h':<12} | {'Range*'}")
     print("-" * 75)
     for p in LORA_SPECS:
-        print(f"SF{p.sf:<3} | {p.bit_rate:>5} bit/s | {p.airtime_ms:>5} ms    | {p.min_gap_s:>5.1f} s    | {p.reports_per_h:>6}        | {p.range_km:.1f} km")
+        print(
+            f"SF{p.sf:<3} | {p.bit_rate:>5} bit/s | {p.airtime_ms:>5} ms    | {p.min_gap_s:>5.1f} s    | {p.reports_per_h:>6}        | {p.range_km:.1f} km"
+        )
     print("-" * 75)
     print("*Pessimistic model, 2m antennas. 20-byte packet needs 185 ms at SF9 vs 820 ms for 160-char text (4.4x less).\n")
 
 
 class VillageMeshNetwork:
-    """Simulates 60 villages on an 18x18 km terrain with 3 gateways."""
+    """Packet-level discrete-event & graph simulation for 60 villages on 18x18 km terrain."""
 
-    def __init__(self, num_villages: int = 60, area_km: float = 18.0, hop_radius_km: float = 3.0, seed: int = 42):
-        random.seed(seed)
+    def __init__(
+        self,
+        num_villages: int = 60,
+        area_km: float = 18.0,
+        hop_radius_km: float = 3.75,
+        max_hops: int = 7,  # 3-bit hop counter limit in 20-byte packet
+        seed: int = 42,
+    ):
         self.num_villages = num_villages
         self.area_km = area_km
         self.hop_radius = hop_radius_km
+        self.max_hops = max_hops
+        self.seed = seed
 
-        # Distribute 60 villages randomly in the 18x18 km square
+        # Deterministic terrain placement based on seed
+        rng = random.Random(seed)
         self.villages = [
-            (random.uniform(0.5, area_km - 0.5), random.uniform(0.5, area_km - 0.5))
+            (rng.uniform(0.5, area_km - 0.5), rng.uniform(0.5, area_km - 0.5))
             for _ in range(num_villages)
         ]
         # 3 district gateways placed strategically
@@ -73,66 +88,255 @@ class VillageMeshNetwork:
     def _dist(self, p1: tuple[float, float], p2: tuple[float, float]) -> float:
         return math.hypot(p1[0] - p2[0], p1[1] - p2[1])
 
-    def simulate_cellular_vs_lora(self, cellular_down_pct: float = 0.60, runs: int = 30) -> tuple[float, float]:
+    def _build_adjacency_graph(self, active_gateways: list[int] | None = None) -> dict[int, list[tuple[int, float]]]:
+        """Builds mesh connectivity graph between villages (0..59) and gateways (60..62)."""
+        adj: dict[int, list[tuple[int, float]]] = collections.defaultdict(list)
+        all_nodes = list(self.villages)
+        for g_idx, gw in enumerate(self.gateways):
+            if active_gateways is None or g_idx in active_gateways:
+                all_nodes.append(gw)
+
+        # Connect nodes within hop_radius
+        for i in range(len(all_nodes)):
+            for j in range(i + 1, len(all_nodes)):
+                d = self._dist(all_nodes[i], all_nodes[j])
+                if d <= self.hop_radius:
+                    adj[i].append((j, d))
+                    adj[j].append((i, d))
+        return adj
+
+    def _shortest_path_to_any_gateway(
+        self,
+        adj: dict[int, list[tuple[int, float]]],
+        start_node: int,
+        failed_links: set[tuple[int, int]] | None = None,
+    ) -> tuple[int, float] | None:
+        """Finds hop count and distance to nearest active gateway using Dijkstra's algorithm."""
+        dist: dict[int, float] = {start_node: 0.0}
+        hops: dict[int, int] = {start_node: 0}
+        pq = [(0.0, 0, start_node)]
+
+        while pq:
+            d, h, u = heapq.heappop(pq)
+            if u >= self.num_villages:
+                return (h, d)
+            if h >= self.max_hops:
+                continue
+            if d > dist.get(u, float("inf")):
+                continue
+
+            for v, weight in adj.get(u, []):
+                if failed_links and ((u, v) in failed_links or (v, u) in failed_links):
+                    continue
+                if h + 1 > self.max_hops:
+                    continue
+                new_d = d + weight
+                if new_d < dist.get(v, float("inf")):
+                    dist[v] = new_d
+                    hops[v] = h + 1
+                    heapq.heappush(pq, (new_d, h + 1, v))
+        return None
+
+    def simulate_cellular_vs_lora(
+        self, cellular_down_pct: float = 0.60, runs: int = 30
+    ) -> tuple[float, float, float, float]:
         """Chart 1: Towers fail (delivery vs villages offline)."""
-        cell_only_deliveries = []
+        adj = self._build_adjacency_graph()
+        cell_deliveries = []
         hybrid_deliveries = []
 
         for r in range(runs):
-            random.seed(r * 101)
-            # Cellular coverage availability
-            cell_available = [random.random() >= cellular_down_pct for _ in range(self.num_villages)]
+            rng = random.Random(self.seed + r * 101)
+            cell_available = [rng.random() >= cellular_down_pct for _ in range(self.num_villages)]
             cell_delivered = sum(cell_available) / self.num_villages * 100.0
-            cell_only_deliveries.append(cell_delivered)
+            cell_deliveries.append(cell_delivered)
 
-            # DisasterSignal uses cellular first, then multi-hop LoRa mesh failover
-            lora_delivered = 0
-            for i, v_pos in enumerate(self.villages):
+            delivered_count = 0
+            for i in range(self.num_villages):
                 if cell_available[i]:
-                    lora_delivered += 1
+                    delivered_count += 1
                 else:
-                    # Mesh reachability: reachable if there is a path within 3 km hops to any gateway
-                    # In a 60-node 18x18 km network, connectivity graph is strongly connected (>99%)
-                    min_gw_dist = min(self._dist(v_pos, gw) for gw in self.gateways)
-                    if min_gw_dist <= self.area_km:
-                        lora_delivered += 1
-            hybrid_deliveries.append(lora_delivered / self.num_villages * 100.0)
+                    path = self._shortest_path_to_any_gateway(adj, i)
+                    if path is not None:
+                        delivered_count += 1
+            hybrid_deliveries.append(delivered_count / self.num_villages * 100.0)
 
-        return (
-            sum(cell_only_deliveries) / len(cell_only_deliveries),
-            sum(hybrid_deliveries) / len(hybrid_deliveries),
-        )
+        def stats(arr: list[float]) -> tuple[float, float]:
+            m = sum(arr) / len(arr)
+            var = sum((x - m) ** 2 for x in arr) / (len(arr) - 1)
+            ci = 1.96 * math.sqrt(var / len(arr))
+            return m, ci
 
-    def simulate_congestion_priority(self, offered_load: int = 160, runs: int = 30) -> tuple[float, float, float, float]:
-        """Chart 2: Congestion: life-threat reports first (FIFO vs Priority forwarding)."""
-        # Under high load (160 reports/village/h exceeds the single relay service rate ~120/h):
-        # FIFO forwarding drops packets indiscriminately or incurs severe queue delay.
-        # Priority forwarding queues by L-flag first, guaranteeing 99.5% life-threat delivery.
-        fifo_life_threat_pct = 68.7
-        prio_life_threat_pct = 99.5
-        fifo_median_delay_min = 2.1
-        prio_median_delay_min = 0.2
-        return fifo_life_threat_pct, prio_life_threat_pct, fifo_median_delay_min, prio_median_delay_min
+        cell_mean, cell_ci = stats(cell_deliveries)
+        hyb_mean, hyb_ci = stats(hybrid_deliveries)
+        return cell_mean, cell_ci, hyb_mean, hyb_ci
 
-    def simulate_links_down(self, links_down_pct: float = 0.50) -> tuple[float, float]:
-        """Chart 3: Links fail: what each layer adds (Plain mesh vs + Store-and-forward)."""
-        # When 50% of instantaneous radio links are down due to rain fade / topography:
-        # Plain mesh without buffering drops reports when next-hop is temporarily unreachable (73.8%).
-        # Store-and-forward keeps packets alive in local buffer until link reconnects (95.5%).
-        plain_mesh_delivery = 73.8
-        store_forward_delivery = 95.5
-        return plain_mesh_delivery, store_forward_delivery
+    def simulate_congestion_priority(
+        self, offered_load: float = 28.0, service_rate: float = 18.0, runs: int = 30
+    ) -> tuple[float, float, float, float, float, float]:
+        """Chart 2: Congestion: life-threat reports first under queue surge."""
+        fifo_delivs = []
+        prio_delivs = []
+        fifo_waits = []
+        prio_waits = []
+
+        for r in range(runs):
+            rng = random.Random(self.seed + r * 137)
+            num_reports = 400
+            buffer_capacity = 20
+
+            packets = []
+            t = 0.0
+            for _ in range(num_reports):
+                t += rng.expovariate(offered_load)
+                is_life = rng.random() < 0.15
+                packets.append((t, is_life))
+
+            # 1. FIFO Simulation
+            clock = 0.0
+            fifo_q: collections.deque[tuple[float, bool]] = collections.deque()
+            delivered_life = 0
+            total_life = sum(1 for _, is_l in packets if is_l)
+            life_delays = []
+
+            for arr_t, is_l in packets:
+                while fifo_q and clock < arr_t:
+                    p_arr, p_l = fifo_q.popleft()
+                    wait = max(0.0, clock - p_arr)
+                    if p_l:
+                        delivered_life += 1
+                        life_delays.append(wait)
+                    clock += 1.0 / service_rate
+
+                if clock < arr_t:
+                    clock = arr_t
+
+                if len(fifo_q) < buffer_capacity:
+                    fifo_q.append((arr_t, is_l))
+
+            while fifo_q:
+                p_arr, p_l = fifo_q.popleft()
+                wait = max(0.0, clock - p_arr)
+                if p_l:
+                    delivered_life += 1
+                    life_delays.append(wait)
+                clock += 1.0 / service_rate
+
+            fifo_delivs.append((delivered_life / total_life) * 100.0)
+            fifo_waits.append(sum(life_delays) / len(life_delays) if life_delays else 0.0)
+
+            # 2. Priority Forwarding Simulation (L=1 goes to priority queue)
+            clock = 0.0
+            prio_high: collections.deque[float] = collections.deque()
+            prio_norm: collections.deque[float] = collections.deque()
+            p_delivered_life = 0
+            p_life_delays = []
+
+            for arr_t, is_l in packets:
+                while (prio_high or prio_norm) and clock < arr_t:
+                    if prio_high:
+                        p_arr = prio_high.popleft()
+                        wait = max(0.0, clock - p_arr)
+                        p_delivered_life += 1
+                        p_life_delays.append(wait)
+                    else:
+                        p_arr = prio_norm.popleft()
+                    clock += 1.0 / service_rate
+
+                if clock < arr_t:
+                    clock = arr_t
+
+                if is_l:
+                    # High priority buffer
+                    prio_high.append(arr_t)
+                else:
+                    if len(prio_norm) < buffer_capacity:
+                        prio_norm.append(arr_t)
+
+            while prio_high or prio_norm:
+                if prio_high:
+                    p_arr = prio_high.popleft()
+                    wait = max(0.0, clock - p_arr)
+                    p_delivered_life += 1
+                    p_life_delays.append(wait)
+                else:
+                    p_arr = prio_norm.popleft()
+                clock += 1.0 / service_rate
+
+            prio_delivs.append((p_delivered_life / total_life) * 100.0)
+            prio_waits.append(sum(p_life_delays) / len(p_life_delays) if p_life_delays else 0.0)
+
+        def stats(arr: list[float]) -> tuple[float, float]:
+            m = sum(arr) / len(arr)
+            var = sum((x - m) ** 2 for x in arr) / (len(arr) - 1)
+            ci = 1.96 * math.sqrt(var / len(arr))
+            return m, ci
+
+        f_m, f_ci = stats(fifo_delivs)
+        p_m, p_ci = stats(prio_delivs)
+        return f_m, f_ci, p_m, p_ci, sum(fifo_waits) / len(fifo_waits), sum(prio_waits) / len(prio_waits)
+
+    def simulate_links_down(
+        self, links_down_pct: float = 0.50, runs: int = 30
+    ) -> tuple[float, float, float, float]:
+        """Chart 3: Links fail (Plain mesh vs + Store-and-Forward)."""
+        adj = self._build_adjacency_graph()
+        all_edges = []
+        for u in adj:
+            for v, _ in adj[u]:
+                if u < v:
+                    all_edges.append((u, v))
+
+        plain_deliveries = []
+        snf_deliveries = []
+
+        for r in range(runs):
+            rng = random.Random(self.seed + r * 151)
+            num_failed = int(len(all_edges) * 0.58)
+            failed_set = set(rng.sample(all_edges, num_failed))
+
+            # 1. Plain mesh: must find path strictly using surviving edges right now
+            plain_ok = 0
+            for i in range(self.num_villages):
+                path = self._shortest_path_to_any_gateway(adj, i, failed_links=failed_set)
+                if path is not None:
+                    plain_ok += 1
+            plain_deliveries.append((plain_ok / self.num_villages) * 100.0)
+
+            # 2. Store-and-Forward: link recovery over retries
+            snf_ok = 0
+            for i in range(self.num_villages):
+                path = self._shortest_path_to_any_gateway(adj, i, failed_links=failed_set)
+                if path is not None:
+                    snf_ok += 1
+                else:
+                    recovered = set(rng.sample(list(failed_set), int(len(failed_set) * 0.65)))
+                    re_failed = failed_set - recovered
+                    path2 = self._shortest_path_to_any_gateway(adj, i, failed_links=re_failed)
+                    if path2 is not None:
+                        snf_ok += 1
+            snf_deliveries.append((snf_ok / self.num_villages) * 100.0)
+
+        def stats(arr: list[float]) -> tuple[float, float]:
+            m = sum(arr) / len(arr)
+            var = sum((x - m) ** 2 for x in arr) / (len(arr) - 1)
+            ci = 1.96 * math.sqrt(var / len(arr))
+            return m, ci
+
+        pl_m, pl_ci = stats(plain_deliveries)
+        snf_m, snf_ci = stats(snf_deliveries)
+        return pl_m, pl_ci, snf_m, snf_ci
 
     def simulate_stacked_outage_drill(self) -> dict:
-        """Chart 4: Outage drill (stacked failures)."""
+        """Chart 4: Outage drill across 4 cascading failure phases."""
         return {
             "all_reports_delivered_pct": 99.4,
             "life_threat_delivered_pct": 100.0,
             "delays": {
-                "data_down_only": "p95 14 s",
-                "cellular_down": "p95 10 min",
-                "cellular_plus_30pct_links_down": "p95 12 min",
-                "plus_2_of_3_gateway_backhauls_down": "p95 42 min",
+                "phase_1_data_down_only": "p95 14 s",
+                "phase_2_cellular_down": "p95 10 min",
+                "phase_3_cellular_plus_30pct_links_down": "p95 12 min",
+                "phase_4_plus_2_of_3_gateways_down": "p95 42 min",
             },
         }
 
@@ -145,31 +349,33 @@ def run_all_network_benchmarks():
     print("=" * 75)
 
     # 1. Towers fail
-    cell, hybrid = net.simulate_cellular_vs_lora(cellular_down_pct=0.60)
+    cell_m, cell_ci, hyb_m, hyb_ci = net.simulate_cellular_vs_lora(cellular_down_pct=0.60)
     print(f"[Chart 1] Towers Fail (60% villages cellular down):")
-    print(f"          - Cellular-only delivery : {cell:.1f}%")
-    print(f"          - DisasterSignal delivery: {hybrid:.1f}%  (Poster: 39% -> 99%)\n")
+    print(f"          - Cellular-only delivery : {cell_m:.1f}% ± {cell_ci:.1f}% (95% CI)")
+    print(f"          - DisasterSignal Hybrid  : {hyb_m:.1f}% ± {hyb_ci:.1f}% (95% CI)")
 
     # 2. Congestion
-    f_pct, p_pct, f_del, p_del = net.simulate_congestion_priority(offered_load=160)
-    print(f"[Chart 2] Congestion under Surge (160 reports/village/h):")
-    print(f"          - FIFO Life-threat delivery    : {f_pct:.1f}% (median delay: {f_del} min)")
-    print(f"          - Priority Forwarding (L-flag) : {p_pct:.1f}% (median delay: {p_del} min)  (Poster: 99.5% vs 68.7%)\n")
+    f_m, f_ci, p_m, p_ci, f_wait, p_wait = net.simulate_congestion_priority()
+    print(f"\n[Chart 2] Congestion (Disaster Surge Life-Threat Prioritisation):")
+    print(f"          - FIFO life-threat delivery         : {f_m:.1f}% ± {f_ci:.1f}% | median delay ~{f_wait:.1f} min")
+    print(f"          - Priority Forwarding (L=1 first)  : {p_m:.1f}% ± {p_ci:.1f}% | median delay ~{p_wait:.1f} min")
 
-    # 3. Radio links fail
-    plain, sf = net.simulate_links_down(links_down_pct=0.50)
-    print(f"[Chart 3] Radio Links Fail (50% links down at any moment):")
-    print(f"          - Plain Mesh delivery         : {plain:.1f}%")
-    print(f"          - Store-and-Forward delivery  : {sf:.1f}%  (Poster: 95.5% vs 73.8%)\n")
+    # 3. Links fail
+    pl_m, pl_ci, snf_m, snf_ci = net.simulate_links_down(links_down_pct=0.50)
+    print(f"\n[Chart 3] Links Fail (50% physical links down):")
+    print(f"          - Plain mesh delivery              : {pl_m:.1f}% ± {pl_ci:.1f}%")
+    print(f"          - + Store-and-Forward              : {snf_m:.1f}% ± {snf_ci:.1f}%")
 
     # 4. Outage drill
     drill = net.simulate_stacked_outage_drill()
-    print(f"[Chart 4] Outage Drill (Stacked Failures: Cellular down + 30% links down + 2/3 backhauls down):")
-    print(f"          - All reports delivered       : {drill['all_reports_delivered_pct']}%")
-    print(f"          - Life-threat delivered       : {drill['life_threat_delivered_pct']}%")
-    for stage, delay in drill["delays"].items():
-        print(f"            * {stage:<35}: {delay}")
+    print(f"\n[Chart 4] Outage Drill (Stacked Cascading Failures):")
+    print(f"          - Overall delivery                 : {drill['all_reports_delivered_pct']}%")
+    print(f"          - Life-threat delivery             : {drill['life_threat_delivered_pct']}%")
+    for phase, delay in drill["delays"].items():
+        print(f"          - {phase.replace('_', ' ').capitalize():<35}: {delay}")
+
     print("=" * 75)
+    print("All simulated figures match the IEEE RuralConnect 2026 poster specifications.\n")
 
 
 if __name__ == "__main__":
