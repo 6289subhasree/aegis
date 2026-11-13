@@ -1,0 +1,1056 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DisasterSignal · Tactical Emergency Triage & LoRa Mesh Command Center</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg-base: #06090e;
+        --bg-surface: rgba(11, 16, 27, 0.82);
+        --bg-surface-elevated: rgba(16, 24, 40, 0.92);
+        --border-subtle: rgba(56, 189, 248, 0.12);
+        --border-active: rgba(0, 229, 255, 0.45);
+        --cyan-glow: #00e5ff;
+        --teal-glow: #10b981;
+        --red-alert: #ef4444;
+        --amber-alert: #f59e0b;
+        --text-primary: #f8fafc;
+        --text-secondary: #94a3b8;
+        --text-muted: #64748b;
+        --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        --font-mono: 'JetBrains Mono', monospace;
+      }
+
+      *, *::before, *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        background-color: var(--bg-base);
+        color: var(--text-primary);
+        font-family: var(--font-sans);
+        overflow-x: hidden;
+        min-height: 100vh;
+        background-image: 
+          radial-gradient(circle at 50% 0%, rgba(0, 229, 255, 0.08) 0%, transparent 60%),
+          radial-gradient(circle at 85% 30%, rgba(239, 68, 68, 0.05) 0%, transparent 40%);
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* Grid Header Bar */
+      header.tactical-bar {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 24px;
+        background: rgba(6, 9, 14, 0.85);
+        backdrop-filter: blur(12px);
+        border-bottom: 1px solid var(--border-subtle);
+      }
+
+      .brand-title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-weight: 800;
+        font-size: 1.15rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #fff;
+      }
+
+      .beacon-glyph {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--cyan-glow);
+        box-shadow: 0 0 12px var(--cyan-glow), 0 0 24px var(--cyan-glow);
+        animation: beacon-pulse 2s infinite ease-in-out;
+      }
+
+      @keyframes beacon-pulse {
+        0%, 100% { transform: scale(0.9); opacity: 0.8; }
+        50% { transform: scale(1.25); opacity: 1; filter: drop-shadow(0 0 8px var(--cyan-glow)); }
+      }
+
+      .nav-pills {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(15, 23, 42, 0.6);
+        padding: 4px;
+        border-radius: 8px;
+        border: 1px solid var(--border-subtle);
+      }
+
+      .pill {
+        padding: 6px 14px;
+        font-size: 0.82rem;
+        font-weight: 500;
+        color: var(--text-secondary);
+        border-radius: 6px;
+        text-decoration: none;
+        transition: all 0.2s;
+        cursor: pointer;
+      }
+
+      .pill:hover, .pill.active {
+        color: #fff;
+        background: rgba(0, 229, 255, 0.15);
+        border: 1px solid rgba(0, 229, 255, 0.3);
+      }
+
+      .status-group {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .badge-sector {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: rgba(15, 23, 42, 0.8);
+        border: 1px solid var(--border-subtle);
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        color: var(--text-secondary);
+      }
+
+      .badge-operational {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(16, 185, 129, 0.12);
+        border: 1px solid rgba(16, 185, 129, 0.35);
+        color: #34d399;
+        font-size: 0.76rem;
+        font-weight: 600;
+        padding: 6px 12px;
+        border-radius: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .badge-alert {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(239, 68, 68, 0.15);
+        border: 1px solid rgba(239, 68, 68, 0.4);
+        color: #f87171;
+        font-size: 0.76rem;
+        font-weight: 600;
+        padding: 6px 12px;
+        border-radius: 6px;
+      }
+
+      /* Main Tactical Arena */
+      .arena-container {
+        position: relative;
+        width: 100%;
+        height: 62vh;
+        min-height: 480px;
+        background: radial-gradient(circle at 50% 60%, rgba(13, 20, 36, 0.95), #06090e);
+        overflow: hidden;
+      }
+
+      #terrainCanvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+
+      /* Left Telemetry Sidebar */
+      .telemetry-sidebar {
+        position: absolute;
+        top: 24px;
+        left: 24px;
+        z-index: 20;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        width: 220px;
+      }
+
+      .sector-header h2 {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: #fff;
+        letter-spacing: -0.02em;
+      }
+
+      .sector-header p {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        font-family: var(--font-mono);
+      }
+
+      .telemetry-node {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: var(--bg-surface);
+        backdrop-filter: blur(12px);
+        border: 1px solid var(--border-subtle);
+        padding: 8px 12px;
+        border-radius: 8px;
+        font-size: 0.78rem;
+        color: var(--text-secondary);
+      }
+
+      .telemetry-node.online {
+        border-left: 3px solid #10b981;
+      }
+
+      .telemetry-node.down {
+        border-left: 3px solid #ef4444;
+        opacity: 0.8;
+      }
+
+      .status-pill-small {
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        font-weight: 600;
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+
+      .status-pill-small.green { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+      .status-pill-small.red { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+
+      /* Floating Tactical HUD Target Card */
+      .hud-target-card {
+        position: absolute;
+        top: 36px;
+        right: 48px;
+        z-index: 25;
+        width: 380px;
+        background: var(--bg-surface-elevated);
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--border-active);
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6), 0 0 24px rgba(0, 229, 255, 0.15);
+        transition: all 0.3s ease;
+      }
+
+      .hud-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        margin-bottom: 12px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        padding-bottom: 10px;
+      }
+
+      .hud-title {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #fff;
+      }
+
+      .hud-meta {
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
+        color: var(--cyan-glow);
+      }
+
+      .hud-score-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(239, 68, 68, 0.2);
+        border: 1px solid var(--red-alert);
+        color: #fca5a5;
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-weight: 800;
+        font-size: 0.82rem;
+      }
+
+      .hud-body {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .hud-info-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.8rem;
+      }
+
+      .hud-info-label { color: var(--text-muted); }
+      .hud-info-val { font-family: var(--font-mono); color: #fff; font-weight: 600; }
+
+      .hud-summary-box {
+        background: rgba(0, 0, 0, 0.35);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        padding: 10px;
+        border-radius: 6px;
+        font-size: 0.82rem;
+        color: #e2e8f0;
+        line-height: 1.4;
+      }
+
+      .hud-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-top: 14px;
+      }
+
+      .hud-btn {
+        padding: 8px 12px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        border-radius: 6px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        text-decoration: none;
+        transition: all 0.2s;
+        border: 1px solid transparent;
+      }
+
+      .hud-btn.primary {
+        background: var(--red-alert);
+        color: #fff;
+      }
+
+      .hud-btn.primary:hover {
+        background: #dc2626;
+        box-shadow: 0 0 16px rgba(239, 68, 68, 0.4);
+      }
+
+      .hud-btn.secondary {
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--text-secondary);
+        border-color: rgba(255, 255, 255, 0.12);
+      }
+
+      .hud-btn.secondary:hover {
+        background: rgba(255, 255, 255, 0.12);
+        color: #fff;
+      }
+
+      /* Bottom Tactical Control Deck */
+      .control-deck {
+        display: grid;
+        grid-template-columns: 320px 240px 1fr 340px;
+        gap: 16px;
+        padding: 24px;
+        background: #080c14;
+        border-top: 1px solid var(--border-subtle);
+      }
+
+      .deck-card {
+        background: var(--bg-surface);
+        backdrop-filter: blur(16px);
+        border: 1px solid var(--border-subtle);
+        border-radius: 12px;
+        padding: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .deck-card h3 {
+        font-size: 0.82rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--text-secondary);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      /* Tactical Buttons */
+      .action-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+      .tac-btn {
+        background: rgba(15, 23, 42, 0.8);
+        border: 1px solid rgba(56, 189, 248, 0.18);
+        color: var(--text-secondary);
+        padding: 10px;
+        border-radius: 8px;
+        font-size: 0.76rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        text-align: center;
+      }
+
+      .tac-btn:hover {
+        background: rgba(0, 229, 255, 0.1);
+        border-color: var(--cyan-glow);
+        color: #fff;
+        box-shadow: 0 0 12px rgba(0, 229, 255, 0.2);
+      }
+
+      .tac-btn.active {
+        background: rgba(0, 229, 255, 0.2);
+        border-color: var(--cyan-glow);
+        color: #fff;
+      }
+
+      /* Radar Display */
+      .radar-wrapper {
+        position: relative;
+        width: 140px;
+        height: 140px;
+        margin: 0 auto;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(16, 185, 129, 0.05) 0%, rgba(6, 9, 14, 0.9) 70%);
+        border: 1px solid rgba(16, 185, 129, 0.35);
+        box-shadow: 0 0 16px rgba(16, 185, 129, 0.15);
+        overflow: hidden;
+      }
+
+      .radar-sweep {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        background: conic-gradient(from 0deg, rgba(16, 185, 129, 0.4) 0deg, transparent 60deg);
+        animation: radar-spin 3s linear infinite;
+      }
+
+      @keyframes radar-spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+
+      .radar-crosshair-x {
+        position: absolute;
+        top: 50%;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: rgba(16, 185, 129, 0.25);
+      }
+
+      .radar-crosshair-y {
+        position: absolute;
+        left: 50%;
+        top: 0;
+        bottom: 0;
+        width: 1px;
+        background: rgba(16, 185, 129, 0.25);
+      }
+
+      .radar-ring {
+        position: absolute;
+        border-radius: 50%;
+        border: 1px dashed rgba(16, 185, 129, 0.2);
+      }
+
+      .radar-ring.r1 { inset: 25%; }
+      .radar-ring.r2 { inset: 50%; }
+
+      .radar-blip {
+        position: absolute;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #ef4444;
+        box-shadow: 0 0 8px #ef4444;
+      }
+
+      .radar-blip.b1 { top: 38%; left: 58%; }
+      .radar-blip.b2 { top: 62%; left: 42%; background: #f59e0b; box-shadow: 0 0 8px #f59e0b; }
+      .radar-blip.b3 { top: 25%; left: 28%; background: #00e5ff; box-shadow: 0 0 8px #00e5ff; }
+
+      /* Telemetry Meters */
+      .meter-bar {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .meter-meta {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.74rem;
+        color: var(--text-secondary);
+      }
+
+      .meter-track {
+        height: 6px;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 999px;
+        overflow: hidden;
+      }
+
+      .meter-fill {
+        height: 100%;
+        border-radius: 999px;
+        transition: width 0.4s ease;
+      }
+
+      .meter-fill.cyan { background: var(--cyan-glow); box-shadow: 0 0 8px var(--cyan-glow); }
+      .meter-fill.red { background: var(--red-alert); box-shadow: 0 0 8px var(--red-alert); }
+      .meter-fill.green { background: #10b981; }
+
+      /* Packet Inspector */
+      .packet-box {
+        background: #03060a;
+        border: 1px solid var(--border-subtle);
+        border-radius: 8px;
+        padding: 10px;
+        font-family: var(--font-mono);
+        font-size: 0.74rem;
+        color: #38bdf8;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .packet-row {
+        display: flex;
+        justify-content: space-between;
+      }
+
+      .packet-b64 {
+        color: #facc15;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+      }
+
+      @media (max-width: 1200px) {
+        .control-deck {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+
+      @media (max-width: 768px) {
+        .control-deck {
+          grid-template-columns: 1fr;
+        }
+        .hud-target-card {
+          position: static;
+          width: calc(100% - 32px);
+          margin: 16px auto;
+        }
+        .telemetry-sidebar {
+          position: static;
+          width: 100%;
+          padding: 16px;
+        }
+        .arena-container {
+          height: 45vh;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Top Tactical Navigation -->
+    <header class="tactical-bar">
+      <div class="brand-title">
+        <span class="beacon-glyph"></span>
+        DisasterSignal
+      </div>
+
+      <nav class="nav-pills">
+        <a class="pill active" href="#">Tactical HUD</a>
+        <a class="pill" href="http://localhost:5173" target="_blank">Authority Queue (4)</a>
+        <a class="pill" href="#telemetry">LoRa Telemetry</a>
+        <a class="pill" href="#radar">Radar Scope</a>
+        <a class="pill" href="#simulations">Simulation Drill</a>
+      </nav>
+
+      <div class="status-group">
+        <div class="badge-sector">
+          <span>SECTOR: DELTA-01</span>
+          <span style="color: var(--cyan-glow)">22.31°N, 87.92°E</span>
+        </div>
+        <div class="badge-operational">
+          <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:#10b981;"></span>
+          LoRa Mesh Active
+        </div>
+        <div class="badge-alert">
+          <span>2 CRITICAL</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 3D Interactive Tactical Terrain Arena -->
+    <main class="arena-container">
+      <canvas id="terrainCanvas"></canvas>
+
+      <!-- Left Telemetry Dock -->
+      <aside class="telemetry-sidebar">
+        <div class="sector-header">
+          <h2>Sector Delta-01</h2>
+          <p>Sundarbans Coastal Basin</p>
+        </div>
+
+        <div class="telemetry-node down">
+          <span>Cellular Tower 4G/5G</span>
+          <span class="status-pill-small red">OFFLINE</span>
+        </div>
+
+        <div class="telemetry-node down">
+          <span>GSM Voice / SMS Tower</span>
+          <span class="status-pill-small red">OFFLINE</span>
+        </div>
+
+        <div class="telemetry-node online">
+          <span>LoRa Mesh (865 MHz)</span>
+          <span class="status-pill-small green">99.4% LIVE</span>
+        </div>
+
+        <div class="telemetry-node online">
+          <span>Solar Battery Relay</span>
+          <span class="status-pill-small green">24.2V · 100%</span>
+        </div>
+
+        <div class="telemetry-node online">
+          <span>Triage Discipline</span>
+          <span class="status-pill-small green">SEVERITY-1ST</span>
+        </div>
+      </aside>
+
+      <!-- Floating Holographic Incident Target Card -->
+      <section class="hud-target-card" id="hudCard">
+        <div class="hud-header">
+          <div>
+            <div class="hud-title" id="hudTargetTitle">RF LoRa Node 105 · Rooftop Entrapment</div>
+            <div class="hud-meta" id="hudTargetFreq">IN865 · SF9 · RSSI -98 dBm · SNR +6.2 dB</div>
+          </div>
+          <div class="hud-score-badge" id="hudTargetBadge">CRITICAL · 91.0</div>
+        </div>
+
+        <div class="hud-body">
+          <div class="hud-info-row">
+            <span class="hud-info-label">Coordinates</span>
+            <span class="hud-info-val" id="hudTargetCoord">22.3100° N, 87.9200° E</span>
+          </div>
+          <div class="hud-info-row">
+            <span class="hud-info-label">People Affected</span>
+            <span class="hud-info-val" id="hudTargetPeople">5 Individuals (2 Children, 1 Elderly)</span>
+          </div>
+          <div class="hud-info-row">
+            <span class="hud-info-label">Signal Breakdown</span>
+            <span class="hud-info-val">L=1.00 · U=0.95 · P=0.46 · V=1.00 · A=1.00</span>
+          </div>
+
+          <div class="hud-summary-box" id="hudTargetSummary">
+            "ছাদে ৫ জন আটকে, জল বাড়ছে" → IndicTrans2: <em>"5 people stuck on roof, water rising fast. Floodwater cresting embankment."</em>
+          </div>
+
+          <div class="hud-actions">
+            <a href="http://localhost:5173" class="hud-btn primary" target="_blank">
+              Launch Rescue Unit
+            </a>
+            <button class="hud-btn secondary" onclick="simulateVoiceCallback()">
+              IVR Call-Back
+            </button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Bottom Tactical Control Deck -->
+    <section class="control-deck">
+      <!-- 1. Mesh & Triage Controls -->
+      <div class="deck-card">
+        <h3>
+          Triage Control Deck
+          <span style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--cyan-glow)">G.S.R. 853(E)</span>
+        </h3>
+        <div class="action-grid">
+          <button class="tac-btn active" onclick="loadPacketDemo()">
+            <span style="font-size: 1.1rem">⚡</span>
+            <span>Load 6-Pkt LoRa</span>
+          </button>
+          <button class="tac-btn" onclick="toggleTowerOutage()">
+            <span style="font-size: 1.1rem">📡</span>
+            <span>Simulate Outage</span>
+          </button>
+          <button class="tac-btn" onclick="selectIncident(0)">
+            <span style="font-size: 1.1rem">🚨</span>
+            <span>Target #1 (Roof)</span>
+          </button>
+          <button class="tac-btn" onclick="selectIncident(1)">
+            <span style="font-size: 1.1rem">🌉</span>
+            <span>Target #2 (Bridge)</span>
+          </button>
+        </div>
+        <div class="meter-bar">
+          <div class="meter-meta">
+            <span>Airtime (SF9 · 20B)</span>
+            <span>185 ms / 7.4s min gap</span>
+          </div>
+          <div class="meter-track">
+            <div class="meter-fill cyan" style="width: 25%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Live Tactical Radar Scanner -->
+      <div class="deck-card" id="radar">
+        <h3>Sector Radar</h3>
+        <div class="radar-wrapper">
+          <div class="radar-sweep"></div>
+          <div class="radar-crosshair-x"></div>
+          <div class="radar-crosshair-y"></div>
+          <div class="radar-ring r1"></div>
+          <div class="radar-ring r2"></div>
+          <div class="radar-blip b1" title="Node 105 (Critical)"></div>
+          <div class="radar-blip b2" title="Node 104 (High)"></div>
+          <div class="radar-blip b3" title="Node 101 (Low)"></div>
+        </div>
+        <div style="text-align: center; font-size: 0.72rem; font-family: var(--font-mono); color: var(--text-muted)">
+          3 Targets Detected in Sector
+        </div>
+      </div>
+
+      <!-- 3. Severity Formula Telemetry -->
+      <div class="deck-card">
+        <h3>Severity Breakdown S(c)</h3>
+        <div class="meter-bar">
+          <div class="meter-meta">
+            <span>Threat to Life (L = 1.00)</span>
+            <span style="color: #f87171">40.0 pts (Rule 1 Escalation)</span>
+          </div>
+          <div class="meter-track">
+            <div class="meter-fill red" style="width: 100%"></div>
+          </div>
+        </div>
+
+        <div class="meter-bar">
+          <div class="meter-meta">
+            <span>Urgency / Deterioration (U = 0.95)</span>
+            <span>19.0 pts</span>
+          </div>
+          <div class="meter-track">
+            <div class="meter-fill cyan" style="width: 95%"></div>
+          </div>
+        </div>
+
+        <div class="meter-bar">
+          <div class="meter-meta">
+            <span>Verification Corroboration (V = 1.00)</span>
+            <span>15.0 pts (4 reports)</span>
+          </div>
+          <div class="meter-track">
+            <div class="meter-fill green" style="width: 100%"></div>
+          </div>
+        </div>
+
+        <div class="meter-bar">
+          <div class="meter-meta">
+            <span>Isolation Cut-off (A = 1.00)</span>
+            <span>10.0 pts</span>
+          </div>
+          <div class="meter-track">
+            <div class="meter-fill cyan" style="width: 100%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. 20-Byte Packet Inspector -->
+      <div class="deck-card">
+        <h3>20-Byte Packet Inspector</h3>
+        <div class="packet-box">
+          <div class="packet-row">
+            <span>FRAME SIZE</span>
+            <span>20 BYTES (CRC-16 OK)</span>
+          </div>
+          <div class="packet-row">
+            <span>BASE64 SMS</span>
+            <span class="packet-b64">wQMABc8hV6xk91kAARk=</span>
+          </div>
+          <div class="packet-row">
+            <span>FLAGS</span>
+            <span>L=1 · U=1 · A=1 · Hops=2</span>
+          </div>
+          <div class="packet-row">
+            <span>CHANNEL / LANG</span>
+            <span>LoRa SF9 / Bengali (bn)</span>
+          </div>
+        </div>
+        <a
+          href="http://localhost:5173"
+          class="tac-btn active"
+          style="text-decoration: none; padding: 10px; margin-top: auto"
+          target="_blank"
+        >
+          Open Authority Dashboard →
+        </a>
+      </div>
+    </section>
+
+    <!-- 3D Topographic Mesh Canvas Engine -->
+    <script>
+      const canvas = document.getElementById('terrainCanvas');
+      const ctx = canvas.getContext('2d');
+
+      let width, height;
+      let angleX = 0.45;
+      let angleY = 0.2;
+      let sweepAngle = 0;
+
+      // Incident Nodes Data
+      const incidents = [
+        {
+          id: 105,
+          title: "RF LoRa Node 105 · Rooftop Entrapment",
+          freq: "IN865 · SF9 · RSSI -98 dBm · SNR +6.2 dB",
+          tier: "CRITICAL · 91.0",
+          coord: "22.3100° N, 87.9200° E",
+          people: "5 Individuals (2 Children, 1 Elderly)",
+          summary: '"ছাদে ৫ জন আটকে, জল বাড়ছে" → IndicTrans2: "5 people stuck on roof, water rising fast. Floodwater cresting embankment."',
+          gridX: 24,
+          gridY: 18,
+          color: "#ef4444"
+        },
+        {
+          id: 104,
+          title: "SMS Node 104 · Collapsed Bridge Cut-off",
+          freq: "GSM 900 / LoRa Relay · RSSI -104 dBm",
+          tier: "HIGH · 72.0 (Rule 2 Escalation)",
+          coord: "22.3400° N, 87.8400° E",
+          people: "25 Villagers Cut Off",
+          summary: '"Bridge collapsed, village completely cut off. No road access or network."',
+          gridX: 14,
+          gridY: 26,
+          color: "#f59e0b"
+        },
+        {
+          id: 101,
+          title: "LoRa Node 101 · Farmland Waterlogging",
+          freq: "IN865 · SF7 · RSSI -84 dBm",
+          tier: "LOW · 15.0",
+          coord: "22.3000° N, 87.8000° E",
+          people: "Farmland Inundated (0 injured)",
+          summary: '"Floodwater entering crops near river bank."',
+          gridX: 8,
+          gridY: 12,
+          color: "#00e5ff"
+        }
+      ];
+
+      function resize() {
+        const dpr = window.devicePixelRatio || 1;
+        width = canvas.parentElement.clientWidth;
+        height = canvas.parentElement.clientHeight;
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+        ctx.scale(dpr, dpr);
+      }
+      window.addEventListener('resize', resize);
+      resize();
+
+      // Topographic Elevation Mesh Grid Generation
+      const COLS = 42;
+      const ROWS = 36;
+      const SPACING = 28;
+
+      function elevation(x, y, t) {
+        // Multi-frequency wave to generate river delta terrain contours
+        const w1 = Math.sin(x * 0.18 + y * 0.12) * 26;
+        const w2 = Math.cos(x * 0.08 - y * 0.16) * 38;
+        const w3 = Math.sin(Math.sqrt((x - 20) ** 2 + (y - 18) ** 2) * 0.3 - t * 0.8) * 8;
+        return w1 + w2 + w3;
+      }
+
+      function project(x, y, z) {
+        // 3D Isometric / Perspective Projection
+        const cosX = Math.cos(angleX);
+        const sinX = Math.sin(angleX);
+        const cosY = Math.cos(angleY);
+        const sinY = Math.sin(angleY);
+
+        // Center offsets
+        const cx = (x - (COLS * SPACING) / 2);
+        const cy = (y - (ROWS * SPACING) / 2);
+
+        // Rotate Y
+        const rx = cx * cosY + cy * sinY;
+        const ry = -cx * sinY + cy * cosY;
+
+        // Rotate X
+        const rz = ry * sinX + z * cosX;
+        const finalY = ry * cosX - z * sinX;
+
+        // Perspective
+        const scale = 540 / (540 + rz);
+        return {
+          px: width / 2 + rx * scale,
+          py: height / 2 + finalY * scale + 30,
+          scale: scale,
+          zDepth: rz
+        };
+      }
+
+      let time = 0;
+      function animate() {
+        time += 0.02;
+        sweepAngle += 0.025;
+        ctx.clearRect(0, 0, width, height);
+
+        // Draw Topographic Mesh Lines
+        for (let r = 0; r < ROWS; r++) {
+          ctx.beginPath();
+          let started = false;
+          for (let c = 0; c < COLS; c++) {
+            const x = c * SPACING;
+            const y = r * SPACING;
+            const z = elevation(c, r, time);
+            const p = project(x, y, z);
+
+            if (!started) {
+              ctx.moveTo(p.px, p.py);
+              started = true;
+            } else {
+              ctx.lineTo(p.px, p.py);
+            }
+          }
+          // Height-based glowing teal / cyan gradient
+          const grad = ctx.createLinearGradient(0, 0, width, height);
+          grad.addColorStop(0, "rgba(0, 229, 255, 0.08)");
+          grad.addColorStop(0.5, "rgba(16, 185, 129, 0.22)");
+          grad.addColorStop(1, "rgba(0, 229, 255, 0.45)");
+          ctx.strokeStyle = grad;
+          ctx.lineWidth = 1.1;
+          ctx.stroke();
+        }
+
+        // Draw Points and Cross-lines
+        for (let c = 0; c < COLS; c += 2) {
+          ctx.beginPath();
+          let started = false;
+          for (let r = 0; r < ROWS; r++) {
+            const x = c * SPACING;
+            const y = r * SPACING;
+            const z = elevation(c, r, time);
+            const p = project(x, y, z);
+
+            if (!started) {
+              ctx.moveTo(p.px, p.py);
+              started = true;
+            } else {
+              ctx.lineTo(p.px, p.py);
+            }
+          }
+          ctx.strokeStyle = "rgba(0, 229, 255, 0.09)";
+          ctx.lineWidth = 0.8;
+          ctx.stroke();
+        }
+
+        // Draw Incident Beacon Pins on 3D Terrain
+        incidents.forEach((inc, idx) => {
+          const x = inc.gridX * SPACING;
+          const y = inc.gridY * SPACING;
+          const z = elevation(inc.gridX, inc.gridY, time);
+          const p = project(x, y, z);
+
+          // Pulse Ring
+          const pulseSize = 10 + Math.sin(time * 3 + idx) * 6;
+          ctx.beginPath();
+          ctx.arc(p.px, p.py, pulseSize, 0, Math.PI * 2);
+          ctx.strokeStyle = inc.color;
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+
+          // Core Dot
+          ctx.beginPath();
+          ctx.arc(p.px, p.py, 5, 0, Math.PI * 2);
+          ctx.fillStyle = inc.color;
+          ctx.fill();
+
+          // Label Flag
+          ctx.fillStyle = "rgba(6, 9, 14, 0.85)";
+          ctx.fillRect(p.px + 10, p.py - 18, 92, 22);
+          ctx.strokeStyle = inc.color;
+          ctx.strokeRect(p.px + 10, p.py - 18, 92, 22);
+
+          ctx.fillStyle = "#fff";
+          ctx.font = "bold 10px 'JetBrains Mono', monospace";
+          ctx.fillText(`TARGET #${idx + 1}`, p.px + 16, p.py - 4);
+        });
+
+        requestAnimationFrame(animate);
+      }
+      animate();
+
+      // Interactive Click on Incidents
+      function selectIncident(index) {
+        const inc = incidents[index];
+        if (!inc) return;
+        document.getElementById('hudTargetTitle').innerText = inc.title;
+        document.getElementById('hudTargetFreq').innerText = inc.freq;
+        document.getElementById('hudTargetBadge').innerText = inc.tier;
+        document.getElementById('hudTargetBadge').style.borderColor = inc.color;
+        document.getElementById('hudTargetCoord').innerText = inc.coord;
+        document.getElementById('hudTargetPeople').innerText = inc.people;
+        document.getElementById('hudTargetSummary').innerText = inc.summary;
+      }
+
+      function loadPacketDemo() {
+        selectIncident(0);
+        alert("6 LoRa Packets injected! Rooftop Rescue prioritised to #1 CRITICAL (Score 91.0).");
+      }
+
+      function toggleTowerOutage() {
+        alert("Cellular tower failover triggered! All 60 villages routing exclusively over 865 MHz LoRa mesh.");
+      }
+
+      function simulateVoiceCallback() {
+        alert("IVR Callback dispatched to Node 105 in Bengali & Hindi.");
+      }
+
+      // Mouse drag rotation for 3D terrain
+      let isDragging = false;
+      let prevMouseX = 0, prevMouseY = 0;
+
+      canvas.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        prevMouseX = e.clientX;
+        prevMouseY = e.clientY;
+      });
+
+      window.addEventListener('mouseup', () => isDragging = false);
+
+      window.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const dx = e.clientX - prevMouseX;
+        const dy = e.clientY - prevMouseY;
+        angleY += dx * 0.004;
+        angleX += dy * 0.004;
+        angleX = Math.max(0.15, Math.min(1.1, angleX));
+        prevMouseX = e.clientX;
+        prevMouseY = e.clientY;
+      });
+    </script>
+  </body>
+</html>
