@@ -64,3 +64,19 @@ Reports without a location fall back to semantic and temporal matching only.
 - Extraction is keyword rules over English text. Every pattern and weight is a proposal to be
   calibrated with domain experts, not a validated model.
 - No authentication yet. Override and status endpoints must be protected before any real use.
+
+## LoRa 20-Byte Packet Specification
+
+The physical and mesh relays transmit compact 20-byte binary telemetry frames to guarantee delivery over single SF9 packets and 28-character Base64 SMS:
+
+| Byte Offset | Field Name | Description & Encoding |
+|---|---|---|
+| `0..1` | Header & Version | Magic identifier `0xAE`, 4-bit protocol version, 4-bit report source |
+| `2..5` | Node Identifier | 32-bit unsigned unique transmitter ID |
+| `6..9` | Latitude | 32-bit signed fixed-point integer (`deg × 1e6`) |
+| `10..13` | Longitude | 32-bit signed fixed-point integer (`deg × 1e6`) |
+| `14` | Incident & Urgency | 4-bit incident classification code, 4-bit priority indicator |
+| `15` | People & Isolation | 6-bit people affected count, 2-bit isolation status |
+| `16..17` | Sequence & Timestamp | 16-bit relative minute timestamp offset from disaster epoch |
+| `18..19` | CRC-16 Checksum | CRC-16-CCITT polynomial error detection across bytes 0..17 |
+
